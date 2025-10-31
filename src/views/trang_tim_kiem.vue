@@ -48,12 +48,11 @@ export default {
       searchResults: [] // Add this line
     }
   },
-  created() {
-    // Handle the search when component is created
-    if (this.searchQuery) {
-      this.handleSearch()
-    }
-  },
+created() {
+  const saved = localStorage.getItem('products')
+  this.products = saved ? JSON.parse(saved) : []
+  this.handleSearch()
+},
   methods: {
     handleSearch() {
       // Xử lý tìm kiếm ở đây

@@ -78,13 +78,10 @@ export default {
     }
   },
   methods: {
-    handleSearch() {
-      this.$router.push({
-        path: '/search',
-        query: { q: this.searchQuery }
-      })
-      console.log('Searching for:', this.searchQuery)
-    },
+   handleSearch() {
+  localStorage.setItem('products', JSON.stringify(this.products))
+  this.$router.push({ path: '/search', query: { q: this.searchQuery } })
+},
     onSelectProduct(product) {
       // ví dụ: chuyển sang trang chi tiết hoặc thêm vào giỏ
       console.log('selected', product)

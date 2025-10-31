@@ -63,11 +63,11 @@ const routes = [
     component: TrangCapNhatTaiKhoan,
   },
 
-   {
-    path: "/orders/detail",
+  {
+    path: "/orders/detail/:id",
     name: "TrangChiTietDonHang",
     component: TrangChiTietDonHang,
-     props: true,
+    props: true,
   },
 ];
 
