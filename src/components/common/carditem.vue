@@ -1,192 +1,131 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 
 const props = defineProps({
   order: {
     type: Object,
-    required: true
-  }
+    required: true,
+  },
 })
 
 const router = useRouter()
-const fullOrder = ref(props.order) // lưu order đầy đủ
+const order = computed(() => props.order ?? {})
 
-onMounted(async () => {
-  try {
-    const res = await fetch(`http://localhost:3001/buyer/customer/order/${props.order.id}`)
-    const data = await res.json()
+const transactionDate = computed(() => {
+  const value = order.value.transactionDate
+  if (!value) {
+    return { date: '', time: '' }
+  }
 
-    console.log('📦 Dữ liệu chi tiết:', data)
-
-    if (data.code === 200 && data.order) {
-      // Gộp chi tiết sản phẩm + thông tin đơn hàng
-      fullOrder.value = {
-        ...data.order,
-        details: data.details || []
-      }
-    } else {
-      console.error('Không tìm thấy chi tiết đơn hàng', data)
-    }
-  } catch (err) {
-    console.error('Lỗi khi tải chi tiết đơn hàng:', err)
+  const [datePart, timePart] = value.split(' ')
+  return {
+    date: datePart ?? '',
+    time: (timePart ?? '').slice(0, 5),
   }
 })
 
+const paymentStatusLabel = computed(() =>
+  order.value.paymentStatus === '1' ? 'Da thanh toan' : 'Chua thanh toan',
+)
+
+const orderStatusLabel = computed(() => {
+  const status = order.value.status || ''
+  const map = {
+    complete: 'Da giao',
+    waiting: 'Cho xu ly',
+    processing: 'Dang xu ly',
+    shipping: 'Dang giao',
+    return: 'Tra hang',
+    cancelled: 'Da huy',
+  }
+
+  return map[status] ?? (status || 'Unknown')
+})
+
+const orderStatusClass = computed(() => {
+  const status = order.value.status
+  if (status === 'complete') return 'bg-green-100 text-green-700'
+  if (status === 'return' || status === 'cancelled') return 'bg-red-100 text-red-700'
+  if (status === 'shipping' || status === 'processing') return 'bg-yellow-100 text-yellow-700'
+  return 'bg-gray-100 text-gray-700'
+})
+
+const primaryProduct = computed(() => order.value.details?.[0] ?? null)
+
+function formatCurrency(value) {
+  const number = Number(value ?? 0)
+  if (Number.isNaN(number)) {
+    return '0đ'
+  }
+  return number.toLocaleString('vi-VN') + 'đ'
+}
+
 function goToDetail() {
-  router.push(`/orders/detail/${props.order.id}`)
+  if (!order.value.id) {
+    return
+  }
+
+  router.push(`/orders/detail/${order.value.id}`)
 }
 </script>
 
 <template>
-  <div
-    class="mx-4 bg-white border-2 border-gray-100 rounded-lg p-4 mb-4 shadow-sm mt-4 cursor-pointer"
+  <button
+    type="button"
+    class="w-full text-left"
     @click="goToDetail"
   >
-    <!-- Mã đơn + thời gian -->
-    <div class="flex justify-between items-center border-b-2 border-gray-100 pb-1">
-      <h2 class="font-semibold">{{ fullOrder.code }}</h2>
-      <div class="time flex items-center gap-2 text-sm text-gray-700">
-        <p>{{ fullOrder.transactionDate?.split(' ')[0] }}</p>
-        <span>|</span>
-        <p>{{ fullOrder.transactionDate?.split(' ')[1] }}</p>
+    <div class="mx-0 mt-4 rounded-lg border border-gray-100 bg-white p-4 shadow-sm">
+      <div class="flex items-center justify-between border-b border-gray-100 pb-2">
+        <h2 class="text-sm font-semibold text-gray-900">{{ order.code || 'Unknown' }}</h2>
+        <div class="flex items-center gap-2 text-xs text-gray-600">
+          <span>{{ transactionDate.date }}</span>
+          <span v-if="transactionDate.date && transactionDate.time">|</span>
+          <span>{{ transactionDate.time }}</span>
+        </div>
       </div>
-    </div>
 
-    <!-- Danh sách sản phẩm -->
-    <div class="mt-2">
-      <p class="font-medium">Sản phẩm</p>
-
-      <div
-        v-if="fullOrder.details && fullOrder.details.length > 0"
-        class="mt-1 space-y-2"
-      >
+      <div class="mt-3 space-y-2 text-xs text-gray-600">
+        <p>San pham</p>
         <div
-          v-for="item in fullOrder.details"
-          :key="item.id"
-          class="item flex gap-2 border-b border-gray-100 pb-1"
+          v-if="primaryProduct"
+          class="flex gap-3"
         >
           <img
-            :src="item.productImage ? `http://localhost:3001${item.productImage}` : '/default.jpg'"
+            :src="primaryProduct.productImage || '/images/nuoc_chanh.png'"
             alt="Product Image"
-            class="w-10 h-10 object-cover"
-          />
-          <div class="info flex justify-between w-full">
+            class="h-12 w-12 rounded object-cover"
+          >
+          <div class="flex w-full justify-between">
             <div>
-              <h3 class="font-medium">{{ item.productName }}</h3>
-              <p class="text-sm text-gray-600">{{ item.price.toLocaleString() }}đ</p>
+              <h3 class="font-medium text-gray-900">{{ primaryProduct.productName }}</h3>
+              <p>{{ formatCurrency(primaryProduct.price) }}</p>
             </div>
-            <p>x{{ item.qty }}</p>
+            <p>x{{ primaryProduct.qty }}</p>
           </div>
+        </div>
+        <div v-else>
+          <p>Khong co thong tin san pham.</p>
         </div>
       </div>
 
-      <p v-else class="text-sm text-gray-500 italic">Không có sản phẩm</p>
-
-      <!-- Ghi chú -->
-      <p class="mt-2 text-gray-600">
-        Ghi chú: {{ fullOrder.note || '—' }}
-      </p>
-
-      <!-- Thanh toán + Tổng tiền -->
-      <div class="flex justify-between items-center mt-2">
+      <div class="mt-4 flex items-center justify-between text-xs">
         <div class="flex gap-2">
-          <div class="hinhthuc border-0 bg-gray-300 rounded-lg p-2">
-            <p class="w-fit">{{ fullOrder.paymentMethod?.toUpperCase() || 'COD' }}</p>
-          </div>
-
-          <div
-            class="thanhtoan border-0 rounded-lg p-2"
-            :class="fullOrder.paymentStatus === '1' ? 'bg-green-200' : 'bg-red-200'"
-          >
-            <p class="w-fit">
-              {{ fullOrder.paymentStatus === '1' ? 'Đã thanh toán' : 'Chưa thanh toán' }}
-            </p>
-          </div>
+          <span class="rounded-lg bg-gray-200 px-2 py-1 text-gray-700">{{ paymentStatusLabel }}</span>
+          <span :class="['rounded-lg px-2 py-1', orderStatusClass]">{{ orderStatusLabel }}</span>
         </div>
-
-        <div class="thanhtien flex gap-2">
-          <p class="text-gray-600">Thành tiền</p>
-          <p class="font-medium">{{ fullOrder.total?.toLocaleString() }}đ</p>
+        <div class="flex items-center gap-1 text-gray-600">
+          <span>Thanh tien</span>
+          <span class="text-sm font-semibold text-gray-900">{{ formatCurrency(order.total) }}</span>
         </div>
       </div>
     </div>
-  </div>
-</template>
-
-
-
-<style scoped>
-    p{
-        font-size: 0.7rem;
-    }
-
-</style>
-
-
-
-
-<!-- API -->
-<!-- <script setup>
-defineProps({
-  order: {
-    type: Object,
-    required: true
-  }
-});
-</script>
-
-<template>
-  <div class="mx-4 bg-white border-2 border-gray-100 rounded-lg p-4 mb-4 shadow-sm mt-4">
-    
-    <div class="flex justify-between items-center border-b-2 border-gray-100 pb-2">
-      <h2 class="font-semibold">{{ order.code }}</h2>
-      <div class="time flex items-center gap-2 text-sm text-gray-700">
-        <p>{{ order.transactionDate?.split(' ')[0] }}</p>
-        <span>|</span>
-        <p>{{ order.transactionDate?.split(' ')[1] }}</p>
-      </div>
-    </div>
-
-    
-    <div class="mt-2">
-      <p class="text-gray-700 font-medium">Khách hàng: {{ order.customerName }}</p>
-      <p class="text-sm text-gray-600 mb-2">SĐT: {{ order.customerPhone }}</p>
-
-      <div class="flex justify-between items-center">
-        <div class="flex gap-2">
-         
-          <div class="hinhthuc border-0 bg-gray-300 rounded-lg p-2">
-            <p class="w-fit">
-              {{ order.paymentStatus == "1" ? "Đã thanh toán" : "Chưa thanh toán" }}
-            </p>
-          </div>
-
-          
-          <div
-            class="thanhtoan border-0 rounded-lg p-2"
-            :class="{
-              'bg-green-100 text-green-700': order.status === 'complete',
-              'bg-yellow-100 text-yellow-700': order.status === 'waiting',
-              'bg-red-100 text-red-700': order.status === 'return'
-            }"
-          >
-            <p class="w-fit capitalize">{{ order.status }}</p>
-          </div>
-        </div>
-
-        <div class="thanhtien flex gap-2">
-          <p class="text-gray-600">Thành tiền</p>
-          <p class="font-semibold">{{ order.total.toLocaleString() }}₫</p>
-        </div>
-      </div>
-    </div>
-  </div>
+  </button>
 </template>
 
 <style scoped>
-p {
+button {
   font-size: 0.7rem;
 }
-</style> -->
-
+</style>

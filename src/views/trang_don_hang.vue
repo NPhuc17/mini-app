@@ -1,52 +1,79 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { onMounted, ref } from 'vue'
 import Header from '../components/common/header.vue'
 import BottomNav from '../components/layout/bottom_nav.vue'
 import CardItem from '../components/common/carditem.vue'
 
 const orders = ref([])
+const isLoading = ref(true)
+const errorMessage = ref('')
 
-onMounted(async () => {
-  try {
-    const res = await fetch('http://localhost:3001/buyer/customer/contact/11875/order')
-    const data = await res.json()
-    console.log('📦 Dữ liệu API:', data)
+function normalizeOrder(payload) {
+  const order = payload?.order ?? {}
 
-    // ✅ Gán đúng dữ liệu
-    orders.value = data.data || []
-    console.log('✅ Orders:', orders.value)
-  } catch (err) {
-    console.error('❌ Lỗi khi tải đơn hàng:', err)
+  return {
+    id: order.id,
+    code: order.code,
+    transactionDate: order.transactionDate,
+    paymentStatus: order.paymentStatus,
+    status: order.status,
+    total: order.total,
+    paymentMethod: order.paymentMethod,
+    type: order.type,
+    customerName: order.customerName,
+    customerPhone: order.customerPhone,
+    details: payload?.details ?? [],
   }
-})
+}
+
+async function loadOrders() {
+  try {
+    const response = await fetch('/order/417')
+    if (!response.ok) {
+      throw new Error(`Request failed with status ${response.status}`)
+    }
+
+    const payload = await response.json()
+    orders.value = [normalizeOrder(payload)]
+  } catch (error) {
+    console.error('Failed to load orders', error)
+    errorMessage.value = 'Khong the tai danh sach don hang.'
+  } finally {
+    isLoading.value = false
+  }
+}
+
+onMounted(loadOrders)
 </script>
 
 <template>
-  <div class="trang-tai-khoan min-h-screen flex flex-col justify-between">
+  <div class="trang-don-hang min-h-screen flex flex-col justify-between">
     <div>
-      <Header title="Lịch sử đơn hàng" />
-
-      <!-- Tabs trạng thái -->
+      <Header title="Lich su don hang" />
       <nav class="w-full bg-white border-b">
         <ul class="flex space-x-4 overflow-x-auto whitespace-nowrap px-4 py-2 scrollbar-hide">
           <li class="flex-shrink-0 px-3 py-2 rounded-lg hover:bg-gray-100 active:border-b-2 active:border-blue-500">
-            Chờ xác nhận
+            Cho xac nhan
           </li>
-          <li class="flex-shrink-0 px-3 py-2 rounded-lg hover:bg-gray-100">Chờ lấy hàng</li>
-          <li class="flex-shrink-0 px-3 py-2 rounded-lg hover:bg-gray-100">Chờ giao hàng</li>
-          <li class="flex-shrink-0 px-3 py-2 rounded-lg hover:bg-gray-100">Đã giao</li>
-          <li class="flex-shrink-0 px-3 py-2 rounded-lg hover:bg-gray-100">Trả hàng</li>
-          <li class="flex-shrink-0 px-3 py-2 rounded-lg hover:bg-gray-100">Đã huỷ</li>
+          <li class="flex-shrink-0 px-3 py-2 rounded-lg hover:bg-gray-100">Cho lay hang</li>
+          <li class="flex-shrink-0 px-3 py-2 rounded-lg hover:bg-gray-100">Cho giao hang</li>
+          <li class="flex-shrink-0 px-3 py-2 rounded-lg hover:bg-gray-100">Da giao</li>
+          <li class="flex-shrink-0 px-3 py-2 rounded-lg hover:bg-gray-100">Tra hang</li>
+          <li class="flex-shrink-0 px-3 py-2 rounded-lg hover:bg-gray-100">Da huy</li>
         </ul>
       </nav>
 
-      <!-- Danh sách đơn hàng -->
-      <div v-if="orders.length > 0">
-        <CardItem v-for="order in orders" :key="order.id" :order="order" />
+      <div class="px-4 pb-20">
+        <p v-if="isLoading" class="py-6 text-center text-sm text-gray-500">Dang tai danh sach don hang...</p>
+        <p v-else-if="errorMessage" class="py-6 text-center text-sm text-red-500">{{ errorMessage }}</p>
+        <CardItem
+          v-else
+          v-for="order in orders"
+          :key="order.id"
+          :order="order"
+        />
       </div>
-      <p v-else class="text-center text-gray-500 mt-4">Không có đơn hàng nào</p>
     </div>
-
     <BottomNav />
   </div>
 </template>
